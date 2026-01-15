@@ -594,8 +594,8 @@ def main():
     
     parser.add_argument(
         "--model", type=str,
-        default="openai/gpt-4o-2024-05-13",
-        choices=["gpt-4o", 
+        default="openai/gpt-4o-mini",
+        choices=["gpt-4o", "openai/gpt-4o-mini"
                  "azure/gpt-4o", "openai/gpt-4o-2024-05-13",
                  "deepseek/deepseek-chat", "deepseek-ai/DeepSeek-R1",
                  "litellm_proxy/claude-3-5-sonnet-20241022", "litellm_proxy/gpt-4o-2024-05-13", "litellm_proxy/o3-mini-2025-01-31",

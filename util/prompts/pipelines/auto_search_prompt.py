@@ -36,7 +36,7 @@ Follow these steps to localize the issue:
 ## Output Format for Final Results:
 Your final output should list the locations requiring modification, wrapped with triple backticks ```
 Each location should include the file path, class name (if applicable), function name, or line numbers, ordered by importance.
-Your answer would better include about 5 files.
+Your answer would better include about 10 files.
 
 ### Examples:
 ```

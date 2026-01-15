@@ -2,7 +2,7 @@
 # or set api key in `scripts/env/set_env.sh`
 # . scripts/env/set_env.sh
 export OPENAI_API_KEY="sk-123..."
-export OPENAI_API_BASE="https://XXXXX"
+# export OPENAI_API_BASE="https://XXXXX"
 
 export PYTHONPATH=$PYTHONPATH:$(pwd)
 export GRAPH_INDEX_DIR='{INDEX_DIR}/{DATASET_NAME}/graph_index_v2.3'

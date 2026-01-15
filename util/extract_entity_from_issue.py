@@ -77,7 +77,7 @@ def extract_keywords(problem_statement, repo_name):
         }
     ]
     response = litellm.completion(
-                    model='azure/gpt-4o',
+                    model='openai/gpt-4o-mini',
                     messages=messages
                 )
     messages.append(convert_to_json(response.choices[0].message))
@@ -86,7 +86,7 @@ def extract_keywords(problem_statement, repo_name):
         'content': EXTRACT_TASK.format(repo_name=repo_name)
     })
     response = litellm.completion(
-                    model='azure/gpt-4o',
+                    model='openai/gpt-4o-mini',
                     messages=messages
                 )
     messages.append(convert_to_json(response.choices[0].message))

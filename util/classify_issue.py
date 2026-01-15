@@ -98,8 +98,8 @@ if __name__ == "__main__":
     parser.add_argument("--eval_n_limit", type=int, default=1)
     parser.add_argument(
         "--model", type=str,
-        default="openai/gpt-4o-2024-05-13",
-        choices=["gpt-4", "gpt-4o", "gpt-35-turbo",
+        default="gpt-4o-mini",
+        choices=["gpt-4", "gpt-4o", "gpt-35-turbo","gpt-4o-mini"
                  "azure/gpt-4o",
                  "openai/gpt-4o-2024-05-13",
                  "litellm_proxy/claude-3-5-sonnet-20241022",
