@@ -1,5 +1,5 @@
 TASK_INSTRUECTION="""
-Given the following GitHub problem description, your objective is to localize the specific files, classes or functions, and lines of code that need modification or contain key information to resolve the issue.
+Given the following GitHub problem description, your objective is to localize the specific files that need modification or contain key information to resolve the issue.
 
 Follow these steps to localize the issue:
 ## Step 1: Categorize and Extract Key Problem Information
@@ -28,31 +28,23 @@ Follow these steps to localize the issue:
     Important: Keep the reconstructed flow focused on the problem, avoiding irrelevant details.
 
 ## Step 4: Locate Areas for Modification
-- Locate specific files, functions, or lines of code requiring changes or containing critical information for resolving the issue.
+- Locate specific files requiring changes or containing critical information for resolving the issue.
 - Consider upstream and downstream dependencies that may affect or be affected by the issue.
 - If applicable, identify where to introduce new fields, functions, or variables.
 - Think Thoroughly: List multiple potential solutions and consider edge cases that could impact the resolution.
 
 ## Output Format for Final Results:
 Your final output should list the locations requiring modification, wrapped with triple backticks ```
-Each location should include the file path, class name (if applicable), function name, or line numbers, ordered by importance.
+Each location should include the file path ordered by importance.
 Your answer would better include about 10 files.
 
 ### Examples:
 ```
 full_path1/file1.py
-line: 10
-class: MyClass1
-function: my_function1
 
 full_path2/file2.py
-line: 76
-function: MyClass2.my_function2
 
 full_path3/file3.py
-line: 24
-line: 156
-function: my_function3
 ```
 
 Return just the location(s)

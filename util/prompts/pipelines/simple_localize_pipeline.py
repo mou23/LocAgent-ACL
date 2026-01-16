@@ -1,33 +1,25 @@
 SEARCH_LOC_TASK_INSTRUCTION="""
 # Task:
-You will be provided with a GitHub problem description. Your objective is to localize the specific files, classes, functions, or variable declarations that require modification or contain essential information to resolve the issue.
+You will be provided with a GitHub problem description. Your objective is to localize the specific files that require modification or contain essential information to resolve the issue.
 
 1. Analyze the issue: Understand the problem described in the issue and identify what might be causing it.
 2. Extract the Necessary Search Parameters from the issue and call retrieval-based functions.
-3. Locate the specific files, functions, methods, or lines of code that are relevant to solving the issue.
+3. Locate the specific files that are relevant to solving the issue.
 """
 
 
 OUTPUT_FORMAT_LOC="""
 # Output Format for Search Results:
 Your final output should list the locations requiring modification, wrapped with triple backticks ```
-Each location should include the file path, class name (if applicable), function name, or line numbers, ordered by importance.
+Each location should include the file path ordered by importance.
 
 ## Examples:
 ```
 full_path1/file1.py
-line: 10
-class: MyClass1
-function: my_function1
 
 full_path2/file2.py
-line: 76
-function: MyClass2.my_function2
 
 full_path3/file3.py
-line: 24
-line: 156
-function: my_function3
 ```
 
 Return just the location(s)

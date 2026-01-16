@@ -116,7 +116,7 @@ def auto_search_process(result_queue,
                         tools = None,
                         traj_data=None,
                         temp=1.0,
-                        max_iteration_num=20,
+                        max_iteration_num=10,
                         use_function_calling=True):
     if tools and ('hosted_vllm' in model_name or 'qwen' in model_name.lower() 
     #             #   or model_name=='azure/gpt-4o' 
@@ -595,7 +595,7 @@ def main():
     parser.add_argument(
         "--model", type=str,
         default="openai/gpt-4o-mini",
-        choices=["gpt-4o", "openai/gpt-4o-mini"
+        choices=["gpt-4o", "openai/gpt-4o-mini",
                  "azure/gpt-4o", "openai/gpt-4o-2024-05-13",
                  "deepseek/deepseek-chat", "deepseek-ai/DeepSeek-R1",
                  "litellm_proxy/claude-3-5-sonnet-20241022", "litellm_proxy/gpt-4o-2024-05-13", "litellm_proxy/o3-mini-2025-01-31",
@@ -611,7 +611,7 @@ def main():
     
     parser.add_argument("--max_attempt_num", type=int, default=1, 
                         help='Only use in generating training trajectories.')
-    parser.add_argument("--num_samples", type=int, default=2)
+    parser.add_argument("--num_samples", type=int, default=1)
     parser.add_argument("--num_processes", type=int, default=-1)
     
     parser.add_argument("--log_level", type=str, default='INFO')
