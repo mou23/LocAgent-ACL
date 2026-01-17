@@ -36,7 +36,6 @@ from plugins.location_tools.repo_ops.repo_ops import (
 import litellm
 from litellm import Message as LiteLLMMessage
 from openai import APITimeoutError
-from evaluation.eval_metric import filtered_instances
 
 
 from time import sleep
@@ -116,7 +115,7 @@ def auto_search_process(result_queue,
                         tools = None,
                         traj_data=None,
                         temp=1.0,
-                        max_iteration_num=10,
+                        max_iteration_num=20,
                         use_function_calling=True):
     if tools and ('hosted_vllm' in model_name or 'qwen' in model_name.lower() 
     #             #   or model_name=='azure/gpt-4o' 
@@ -145,140 +144,144 @@ def auto_search_process(result_queue,
     last_message = None
     finish = False
     while not finish:
-        cur_interation_num += 1
-        if cur_interation_num == max_iteration_num:
-            messages.append({
-                'role': 'user',
-                'content': 'The Maximum number of interation has been reached, please generate your final output with required format and use <finish></finish> to exit.'
-            })
-            traj_msgs.append({
-                'role': 'user',
-                'content': 'The Maximum number of interation has been reached, please generate your final output with required format and use <finish></finish> to exit.'
-            })
-
         try:
-            # new conversation
-            if tools and ('hosted_vllm' in model_name or 'qwen' in model_name.lower()):
-                messages = convert_fncall_messages_to_non_fncall_messages(messages, tools, add_in_context_learning_example=False)
-                response = litellm.completion(
-                    model=model_name,
-                    temperature=temp, top_p=0.8, repetition_penalty=1.05, 
-                    messages=messages,
-                    stop=NON_FNCALL_STOP_WORDS
-                )
-            elif tools:
-                response = litellm.completion(
-                    model=model_name,
-                    tools=tools,
-                    messages=messages,
-                    temperature=temp,
-                    # stop=['</execute_ipython>'], #</finish>',
-                )
-            else:
-                response = litellm.completion(
-                    model=model_name,
-                    messages=messages,
-                    temperature=temp,
-                    stop=['</execute_ipython>'], #</finish>',
-                )
-        except litellm.BadRequestError as e:
-            # If there's an error, send the error info back to the parent process
-            result_queue.put({'error': str(e), 'type': 'BadRequestError'})
-            return
-        
-        if last_message and response.choices[0].message.content == last_message:
-            messages.append({
-                "role": "user",
-                "content": "OBSERVATION:\n" + "Don't repeat your response.\n" + fake_user_msg,
-            })
-            traj_msgs.append({
-                "role": "user",
-                "content": "OBSERVATION:\n" + "Don't repeat your response.\n" + fake_user_msg,
-            })
-            continue
-        
-        raw_response = deepcopy(response)
-        # logging.info('response.choices[0].message')
-        if tools and ('hosted_vllm' in model_name or 'qwen' in model_name.lower()
-                      or 'deepseek' in model_name
-                      ):
+            cur_interation_num += 1
+            if cur_interation_num == max_iteration_num:
+                messages.append({
+                    'role': 'user',
+                    'content': 'The Maximum number of interation has been reached, please generate your final output with required format and use <finish></finish> to exit.'
+                })
+                traj_msgs.append({
+                    'role': 'user',
+                    'content': 'The Maximum number of interation has been reached, please generate your final output with required format and use <finish></finish> to exit.'
+                })
+
             try:
-                non_fncall_response_message = response.choices[0].message
-                fn_call_messages_with_response = (
-                    convert_non_fncall_messages_to_fncall_messages(
-                        [non_fncall_response_message], tools # messages + 
+                # new conversation
+                if tools and ('hosted_vllm' in model_name or 'qwen' in model_name.lower()):
+                    messages = convert_fncall_messages_to_non_fncall_messages(messages, tools, add_in_context_learning_example=False)
+                    response = litellm.completion(
+                        model=model_name,
+                        temperature=temp, top_p=0.8, repetition_penalty=1.05, 
+                        messages=messages,
+                        stop=NON_FNCALL_STOP_WORDS
                     )
-                )
-                fn_call_response_message = fn_call_messages_with_response[-1]
-                if not isinstance(fn_call_response_message, LiteLLMMessage):
-                    fn_call_response_message = LiteLLMMessage(
-                        **fn_call_response_message
+                elif tools:
+                    response = litellm.completion(
+                        model=model_name,
+                        tools=tools,
+                        messages=messages,
+                        temperature=temp,
+                        # stop=['</execute_ipython>'], #</finish>',
                     )
-                response.choices[0].message = fn_call_response_message
-            except:
-                logging.info('convert none fncall messages failed.')
-                continue 
-                
-        last_message = response.choices[0].message.content
-        print(response.choices[0].message)
-        messages.append(convert_to_json(raw_response.choices[0].message))
-        traj_msgs.append(convert_to_json(raw_response.choices[0].message))
-        prompt_tokens += response.usage.prompt_tokens
-        completion_tokens += response.usage.completion_tokens  
-            
-        actions = parser.parse(response)
-        if not isinstance(actions, List):
-            actions = [actions]
-        for action in actions:
-            logging.debug(action.action_type)
-            if action.action_type == ActionType.FINISH:
-                final_output = action.thought
-                logging.info('='*15)
-                logging.info("\nFinal Response:=\n" + final_output)
-                finish = True # break
-            elif action.action_type == ActionType.MESSAGE:
-                logging.debug("thought:\n" + action.content)
-                # check if enough
-                messages.append({"role": "user", "content": fake_user_msg})
-                traj_msgs.append({"role": "user", "content": fake_user_msg})
-                # continue
-            elif action.action_type == ActionType.RUN_IPYTHON:
-                ipython_code = action.code.strip('`')
-                logging.info(f"Executing code:\n```\n{ipython_code}\n```")
-                function_response = execute_ipython(ipython_code)
-                try:
-                    function_response = eval(function_response)
-                except SyntaxError:
-                    function_response = function_response
-                if not isinstance(function_response, str):
-                    function_response = str(function_response)
-                
-                logging.info("OBSERVATION:\n" + function_response)
-                if not tools:
-                    messages.append({
-                        "role": "user",
-                        "content": "OBSERVATION:\n" + function_response,
-                    })
-                    traj_msgs.append({
-                        "role": "user",
-                        "content": "OBSERVATION:\n" + function_response,
-                    })
                 else:
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": action.tool_call_id,
-                        "name": action.function_name,
-                        "content": "OBSERVATION:\n" + function_response,
-                    })
-                    traj_msgs.append({
-                        "role": "tool",
-                        "tool_call_id": action.tool_call_id,
-                        "name": action.function_name,
-                        "content": "OBSERVATION:\n" + function_response,
-                    })
-            else:
-                logging.warning('Error Action!')
-                # return
+                    response = litellm.completion(
+                        model=model_name,
+                        messages=messages,
+                        temperature=temp,
+                        stop=['</execute_ipython>'], #</finish>',
+                    )
+            except litellm.BadRequestError as e:
+                # If there's an error, send the error info back to the parent process
+                result_queue.put({'error': str(e), 'type': 'BadRequestError'})
+                return
+            
+            if last_message and response.choices[0].message.content == last_message:
+                messages.append({
+                    "role": "user",
+                    "content": "OBSERVATION:\n" + "Don't repeat your response.\n" + fake_user_msg,
+                })
+                traj_msgs.append({
+                    "role": "user",
+                    "content": "OBSERVATION:\n" + "Don't repeat your response.\n" + fake_user_msg,
+                })
+                continue
+            
+            raw_response = deepcopy(response)
+            # logging.info('response.choices[0].message')
+            if tools and ('hosted_vllm' in model_name or 'qwen' in model_name.lower()
+                        or 'deepseek' in model_name
+                        ):
+                try:
+                    non_fncall_response_message = response.choices[0].message
+                    fn_call_messages_with_response = (
+                        convert_non_fncall_messages_to_fncall_messages(
+                            [non_fncall_response_message], tools # messages + 
+                        )
+                    )
+                    fn_call_response_message = fn_call_messages_with_response[-1]
+                    if not isinstance(fn_call_response_message, LiteLLMMessage):
+                        fn_call_response_message = LiteLLMMessage(
+                            **fn_call_response_message
+                        )
+                    response.choices[0].message = fn_call_response_message
+                except:
+                    logging.info('convert none fncall messages failed.')
+                    continue 
+                    
+            last_message = response.choices[0].message.content
+            print(response.choices[0].message)
+            messages.append(convert_to_json(raw_response.choices[0].message))
+            traj_msgs.append(convert_to_json(raw_response.choices[0].message))
+            prompt_tokens += response.usage.prompt_tokens
+            completion_tokens += response.usage.completion_tokens  
+                
+            actions = parser.parse(response)
+            if not isinstance(actions, List):
+                actions = [actions]
+            for action in actions:
+                logging.debug(action.action_type)
+                if action.action_type == ActionType.FINISH:
+                    final_output = action.thought
+                    logging.info('='*15)
+                    logging.info("\nFinal Response:=\n" + final_output)
+                    finish = True # break
+                elif action.action_type == ActionType.MESSAGE:
+                    logging.debug("thought:\n" + action.content)
+                    # check if enough
+                    messages.append({"role": "user", "content": fake_user_msg})
+                    traj_msgs.append({"role": "user", "content": fake_user_msg})
+                    # continue
+                elif action.action_type == ActionType.RUN_IPYTHON:
+                    ipython_code = action.code.strip('`')
+                    logging.info(f"Executing code:\n```\n{ipython_code}\n```")
+                    function_response = execute_ipython(ipython_code)
+                    try:
+                        function_response = eval(function_response)
+                    except SyntaxError:
+                        function_response = function_response
+                    if not isinstance(function_response, str):
+                        function_response = str(function_response)
+                    
+                    logging.info("OBSERVATION:\n" + function_response)
+                    if not tools:
+                        messages.append({
+                            "role": "user",
+                            "content": "OBSERVATION:\n" + function_response,
+                        })
+                        traj_msgs.append({
+                            "role": "user",
+                            "content": "OBSERVATION:\n" + function_response,
+                        })
+                    else:
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": action.tool_call_id,
+                            "name": action.function_name,
+                            "content": "OBSERVATION:\n" + function_response,
+                        })
+                        traj_msgs.append({
+                            "role": "tool",
+                            "tool_call_id": action.tool_call_id,
+                            "name": action.function_name,
+                            "content": "OBSERVATION:\n" + function_response,
+                        })
+                else:
+                    logging.warning('Error Action!')
+                    # return
+        except Exception as e:
+            result_queue.put({'error': str(e), 'type': 'UnhandledException'})
+            return
 
     # save traj
     traj_data = {
@@ -389,19 +392,26 @@ def run_localize(rank, args, bug_queue, log_queue, output_file_lock, traj_file_l
                         raise TimeoutError
                     
                     # loc_result, messages, traj_data = result_queue.get()
-                    result = result_queue.get()
-                    if isinstance(result, dict) and 'error' in result and result['type'] == 'BadRequestError':
-                        raise litellm.BadRequestError(result['error'], args.model, args.model.split('/')[0])
-                        # print(f"Error occurred in subprocess: {result['error']}")
+                    result = result_queue.get(timeout=600)
+                    if isinstance(result, dict) and "error" in result:
+                        err_type = result.get("type", "UnknownError")
+
+                        if err_type == "BadRequestError":
+                            raise litellm.BadRequestError(result["error"], args.model, args.model.split('/')[0])
+
+                        # Any other child error (e.g., UnhandledException)
+                        raise RuntimeError(f"ChildProcessError[{err_type}]: {result['error']}")
                     else:
                         loc_result, messages, traj_data = result
                         
                 except litellm.BadRequestError as e:
                     logger.warning(f'{e}. Try again.')
+                    max_attempt_num = max_attempt_num - 1
                     continue
                 except APITimeoutError:
                     logger.warning(f"APITimeoutError. Try again.")
                     sleep(10)
+                    max_attempt_num = max_attempt_num - 1
                     continue
                 except TimeoutError:
                     logger.warning(f"Processing time exceeded 15 minutes. Try again.")
@@ -411,9 +421,14 @@ def run_localize(rank, args, bug_queue, log_queue, output_file_lock, traj_file_l
                     logger.warning(f'{e}. Try again.')
                     max_attempt_num = max_attempt_num - 1
                     continue
+                except Exception as e:
+                    logger.warning(f'{e}. Try again.')
+                    max_attempt_num = max_attempt_num - 1
+                    continue
 
                 loc_end_time = time.time()
                 if not loc_result:
+                    max_attempt_num = max_attempt_num - 1
                     continue # empty result
 
                 total_prompt_tokens += traj_data['usage']['prompt_tokens']

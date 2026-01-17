@@ -183,3 +183,6 @@ sft/
 config.toml
 unsloth_compiled_cache/
 wandb/
+
+swe-res-1_*/
+venv311/
